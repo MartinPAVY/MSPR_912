@@ -1,0 +1,4 @@
+flask
+waitress
+flask-cors
+tox==3.*

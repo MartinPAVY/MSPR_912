@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portail COFRAP - Secure Auth</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            padding: 2rem;
+            background-color: #f4f4f9;
+        }
+
+        .wrapper {
+            display: flex;
+            gap: 50px;
+            justify-content: center;
+        }
+
+        .card {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 400px;
+        }
+
+        h2 {
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+
+        input {
+            padding: 10px;
+            width: 90%;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        button {
+            padding: 10px 20px;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            width: 100%;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .output {
+            margin-top: 15px;
+            font-size: 0.9em;
+            word-break: break-all;
+        }
+
+        .success {
+            color: green;
+            font-weight: bold;
+        }
+
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1 style="text-align:center;">Portail Sécurisé COFRAP</h1>
+
+    <div class="wrapper">
+        <div class="card">
+            <h2>1. Inscription</h2>
+            <p>Créez un compte. Le système générera votre mot de passe et votre QR 2FA.</p>
+            <input type="text" id="reg_username" placeholder="Nom d'utilisateur">
+            <button onclick="registerUser()">Générer le compte</button>
+
+            <div id="reg_result" class="output"></div>
+            <img id="qrcode" src="" style="display:none; width: 150px; margin: 10px auto; display: block;" />
+        </div>
+
+        <div class="card">
+            <h2>2. Connexion</h2>
+            <p>Testez l'authentification (User + Pass + Code Authenticator).</p>
+            <input type="text" id="login_user" placeholder="Nom d'utilisateur">
+            <input type="text" id="login_pass" placeholder="Mot de passe reçu">
+            <input type="text" id="login_2fa" placeholder="Code 2FA (6 chiffres)">
+            <button onclick="authUser()" style="background-color: #28a745;">Se connecter</button>
+
+            <div id="auth_result" class="output"></div>
+        </div>
+    </div>
+
+    <script>
+        // --- FONCTION INSCRIPTION ---
+        async function registerUser() {
+            const user = document.getElementById("reg_username").value;
+            const resultDiv = document.getElementById("reg_result");
+            const img = document.getElementById("qrcode");
+
+            if (!user) return alert("Nom d'utilisateur requis");
+            resultDiv.innerHTML = "Génération en cours...";
+            img.style.display = 'none';
+
+            try {
+                const response = await fetch('http://127.0.0.1:31112/function/register-user', {
+                    method: 'POST', body: user
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    resultDiv.innerHTML = `<span class="success">Succès !</span><br>
+                <strong>Mot de passe :</strong> ${data.password_generated}<br>
+                <em>(Copiez ce mot de passe pour le test de connexion)</em>`;
+                    img.src = "data:image/png;base64," + data.qr_code;
+                    img.style.display = 'block';
+                } else {
+                    resultDiv.innerHTML = `<span class="error">Erreur: ${data.error || 'Inconnue'}</span>`;
+                }
+            } catch (e) { resultDiv.innerHTML = `<span class="error">Erreur réseau</span>`; }
+        }
+
+        // --- FONCTION CONNEXION ---
+        async function authUser() {
+            const payload = {
+                username: document.getElementById("login_user").value,
+                password: document.getElementById("login_pass").value,
+                code_2fa: document.getElementById("login_2fa").value
+            };
+            const resultDiv = document.getElementById("auth_result");
+            resultDiv.innerHTML = "Vérification...";
+
+            try {
+                const response = await fetch('http://127.0.0.1:31112/function/auth-user', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+
+                if (data.auth) {
+                    resultDiv.innerHTML = `<span class="success">✅ ${data.message}</span>`;
+                } else {
+                    resultDiv.innerHTML = `<span class="error">❌ Refusé : ${data.reason}</span>`;
+                }
+            } catch (e) { resultDiv.innerHTML = `<span class="error">Erreur réseau</span>`; }
+        }
+    </script>
+
+</body>
+
+</html>

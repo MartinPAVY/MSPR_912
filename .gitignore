@@ -1,0 +1,122 @@
+# Build artifacts
+build/
+*.zip
+
+# OpenFaaS
+.openfaas/
+template/.git/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.cache/
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git
+.mypy_cache
+.pytest_cache
+.hypothesis
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+/tmp/
+.temporary/
+
+# Logs
+*.log
+logs/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Docker
+.dockerignore
+
+# Kubernetes
+*.kubeconfig
+
+# Secrets (never commit)
+secrets/
+*.key
+*.pem
+*.crt
+
+# Database dumps
+*.sql
+*.db
+*.sqlite
+*.sqlite3
+
+# Backup files
+*.bak
+*.backup
+
+# Node.js (pour les templates)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Java (pour les templates)
+*.class
+*.jar
+*.war
+*.ear
+target/
+.gradle/
+build/
+gradle-app.setting
+!gradle-wrapper.jar
+
+# Test results
+test-results/
+coverage/
+
+# Runtime files
+*.pid
+*.lock
+
+# Local configuration overrides  
+config.local.*
+settings.local.*
+
+# Archives
+*.tar
+*.tar.gz
+*.tar.bz2
+*.zip
+*.7z
+*.rar
+
+# Generated documentation
+docs/_build/

@@ -1,0 +1,19 @@
+version: 1.0
+provider:
+  name: openfaas
+  gateway: http://127.0.0.1:8080
+functions:
+  register-user:
+    lang: python3-flask-debian
+    handler: ./register-user
+    image: martinpavy/register-user:final
+    build_args:
+      TEST_ENABLED: false
+
+  auth-user:
+    lang: python3-flask-debian
+    handler: ./auth-user
+    image: martinpavy/auth-user:final
+    build_args:
+      TEST_ENABLED: false
+
