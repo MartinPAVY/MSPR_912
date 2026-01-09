@@ -99,7 +99,13 @@ fi
 echo -e "${BLUE}[6/7] Construction et Déploiement des Fonctions...${NC}"
 # Nécessite d'être connecté au Docker Hub
 echo "⚠️ Assurez-vous d'être connecté à Docker Hub (docker login)."
-faas-cli up -f stack.yaml
+# 1. On force la suppression des images locales pour être sûr
+docker rmi -f martinpavy/auth-user:v6
+docker rmi -f martinpavy/register-user:v6
+
+# 2. On lance la construction avec l'option --no-cache (C'est ça le secret)
+echo "🚧 Construction forcée sans cache..."
+faas-cli up -f stack.yaml --no-cache
 
 # 6. INITIALISATION DONNÉES
 # ------------------------------------------
@@ -109,7 +115,53 @@ echo -e "${BLUE}[7/7] Création de la table SQL 'users'...${NC}"
 sleep 5
 kubectl exec -it -n openfaas-fn postgres -- psql -U postgres -d cofrap_db -c "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username VARCHAR(50), password TEXT, mfa TEXT, gendate VARCHAR(50), expired INT DEFAULT 0);"
 
-# 7. NETTOYAGE ET INSTRUCTIONS FINALES
+# ------------------------------------------
+# 7. INSTALLATION DU DASHBOARD K8S (Bonus)
+# ------------------------------------------
+echo -e "${BLUE}[8/8] Installation du Dashboard Kubernetes...${NC}"
+
+# Ajout du repo Helm officiel
+helm repo add kubernetes-dashboard https://kubernetes.github.io/dashboard/ > /dev/null 2>&1
+helm repo update > /dev/null 2>&1
+
+# Installation du Dashboard
+helm upgrade --install kubernetes-dashboard kubernetes-dashboard/kubernetes-dashboard \
+    --create-namespace --namespace kubernetes-dashboard \
+    --set protocolHttp=true \
+    --set service.externalPort=9090 \
+    --wait > /dev/null 2>&1
+
+# Création du compte Admin (Indispensable pour voir les ressources)
+cat <<EOF | kubectl apply -f - > /dev/null 2>&1
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: admin-user
+  namespace: kubernetes-dashboard
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: admin-user
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: admin-user
+  namespace: kubernetes-dashboard
+EOF
+
+echo "✅ Dashboard installé."
+
+# Récupération du Token de connexion
+# Note: La commande change selon les versions de K8s, celle-ci est la plus robuste pour Docker Desktop récent
+TOKEN=$(kubectl -n kubernetes-dashboard create token admin-user)
+
+# ------------------------------------------
+
+# 8. NETTOYAGE ET INSTRUCTIONS FINALES
 # ------------------------------------------
 # On tue le port-forward temporaire car l'utilisateur doit le lancer lui-même pour voir les logs
 kill $PID_FWD
@@ -120,10 +172,17 @@ echo -e "${GREEN}==============================================${NC}"
 echo ""
 echo "Pour utiliser votre projet, ouvrez 2 terminaux :"
 echo ""
-echo -e "1️⃣  ${BLUE}Terminal 1 (Tunnel Backend) :${NC}"
-echo "   kubectl port-forward -n openfaas svc/gateway 8080:8080"
+echo -e "1️⃣  ${BLUE}Terminal 1 (Tunnel OpenFaaS & Dashboard) :${NC}"
+echo "   kubectl port-forward -n openfaas svc/gateway 8080:8080 &"
+echo "   kubectl -n kubernetes-dashboard port-forward svc/kubernetes-dashboard-kong-proxy 8443:443"
 echo ""
 echo -e "2️⃣  ${BLUE}Terminal 2 (Serveur Frontend) :${NC}"
 echo "   cd frontend && python3 -m http.server 8000"
 echo ""
-echo "Ensuite, allez sur : http://localhost:8000"
+echo -e "3️⃣  ${BLUE}Accès Visuels :${NC}"
+echo "   🌍 Site Web : http://localhost:8000"
+echo "   📊 Dashboard K8s : https://localhost:8443"
+echo ""
+echo -e "${RED}🔑 TOKEN POUR LE DASHBOARD (Copiez-le) :${NC}"
+echo $TOKEN
+echo ""
