@@ -111,7 +111,7 @@
             img.style.display = 'none';
 
             try {
-                const response = await fetch('http://127.0.0.1:31112/function/register-user', {
+                const response = await fetch('http://127.0.0.1:8080/function/register-user', {
                     method: 'POST', body: user
                 });
                 const data = await response.json();
@@ -139,7 +139,7 @@
             resultDiv.innerHTML = "Vérification...";
 
             try {
-                const response = await fetch('http://127.0.0.1:31112/function/auth-user', {
+                const response = await fetch('http://127.0.0.1:8080/function/auth-user', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
