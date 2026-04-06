@@ -50,66 +50,66 @@ def handle(req):
     if req == "" or req is None:
         return "", 200, headers
 
+    # Accept both plain username string and JSON {"username": "..."}
     try:
+        payload = json.loads(req)
+        username = payload.get("username", "").strip()
+    except (json.JSONDecodeError, AttributeError):
         username = req.strip()
 
-        if not USERNAME_RE.match(username):
-            return json.dumps({
-                "error": "Nom d'utilisateur invalide (3-50 caractères : lettres, chiffres, _ -)"
-            }), 400, headers
+    if not username:
+        return json.dumps({"error": "Username requis"}), 400, headers
 
-        # 1. Générer MDP (plaintext retourné à l'utilisateur, hash stocké en DB)
-        alphabet = string.ascii_letters + string.digits + string.punctuation
-        password = ''.join(secrets.choice(alphabet) for i in range(24))
-        password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+    if not USERNAME_RE.match(username):
+        return json.dumps({
+            "error": "Nom d'utilisateur invalide (3-50 caractères : lettres, chiffres, _ -)"
+        }), 400, headers
 
-        # 2. Générer Secret 2FA (TOTP)
-        mfa_secret = pyotp.random_base32()
-
-        # 3. Générer QR Code
-        totp_uri = pyotp.totp.TOTP(mfa_secret).provisioning_uri(name=username, issuer_name="COFRAP")
-        img = qrcode.make(totp_uri)
-        buffered = io.BytesIO()
-        img.save(buffered, format="PNG")
-        img_str = base64.b64encode(buffered.getvalue()).decode()
-
-        # 4. Upsert DB
+    try:
         conn = connect_db()
         if conn is None:
             return json.dumps({"error": "Database unavailable"}), 503, headers
         cur = conn.cursor()
 
         cur.execute("SELECT 1 FROM users WHERE username = %s", (username,))
-        existed = cur.fetchone() is not None
+        if cur.fetchone() is None:
+            cur.close()
+            conn.close()
+            return json.dumps({"error": "Utilisateur introuvable"}), 404, headers
+
+        # Generate new credentials
+        alphabet = string.ascii_letters + string.digits + string.punctuation
+        password = ''.join(secrets.choice(alphabet) for i in range(24))
+        password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
+        mfa_secret = pyotp.random_base32()
+
+        totp_uri = pyotp.totp.TOTP(mfa_secret).provisioning_uri(name=username, issuer_name="COFRAP")
+        img = qrcode.make(totp_uri)
+        buffered = io.BytesIO()
+        img.save(buffered, format="PNG")
+        img_str = base64.b64encode(buffered.getvalue()).decode()
 
         cur.execute(
             """
-            INSERT INTO users (username, password, mfa, gendate, expired)
-            VALUES (%s, %s, %s, %s, 0)
-            ON CONFLICT (username) DO UPDATE
-                SET password = EXCLUDED.password,
-                    mfa      = EXCLUDED.mfa,
-                    gendate  = EXCLUDED.gendate,
-                    expired  = 0
+            UPDATE users
+            SET password = %s,
+                mfa      = %s,
+                gendate  = %s,
+                expired  = 0
+            WHERE username = %s
             """,
-            (username, password_hash, mfa_secret, int(time.time()))
+            (password_hash, mfa_secret, int(time.time()), username)
         )
         conn.commit()
         cur.close()
         conn.close()
 
-        status = "renewed" if existed else "created"
-        message = (
-            "Compte renouvelé. Scannez le nouveau QR Code dans Google Authenticator."
-            if existed else
-            "Compte créé. Scannez le QR Code dans Google Authenticator."
-        )
-
         return json.dumps({
             "qr_code": img_str,
             "password_generated": password,
-            "message": message,
-            "status": status
+            "message": "Compte renouvelé. Scannez le nouveau QR Code dans Google Authenticator.",
+            "status": "renewed"
         }), 200, headers
 
     except Exception as e:

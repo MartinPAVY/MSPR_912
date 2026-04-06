@@ -71,6 +71,9 @@ echo "✅ OpenFaaS est déployé."
 # ------------------------------------------
 echo -e "${BLUE}[4/7] Connexion à OpenFaaS...${NC}"
 
+# Libérer le port 8080 s'il est déjà occupé
+lsof -ti:8080 | xargs kill -9 2>/dev/null || true
+
 # On lance un port-forward temporaire en arrière-plan pour se connecter
 kubectl port-forward -n openfaas svc/gateway 8080:8080 > /dev/null 2>&1 &
 PID_FWD=$!
@@ -84,6 +87,13 @@ echo "✅ Connecté avec succès (Admin Password récupéré)."
 # 5. DÉPLOIEMENT INFRA (DB + Fonctions)
 # ------------------------------------------
 echo -e "${BLUE}[5/7] Déploiement de la Base de Données...${NC}"
+
+# Créer le secret Kubernetes pour le mot de passe PostgreSQL
+# (idempotent : --dry-run + apply évite l'erreur si le secret existe déjà)
+kubectl create secret generic db-password \
+    --from-literal=db-password=monSuperMotDePasse \
+    -n openfaas-fn \
+    --dry-run=client -o yaml | kubectl apply -f -
 
 # Appliquer le fichier postgres.yaml (Doit être dans le même dossier)
 if [ -f "postgres.yaml" ]; then
@@ -113,7 +123,7 @@ echo -e "${BLUE}[7/7] Création de la table SQL 'users'...${NC}"
 
 # On attend un peu que Postgres soit prêt à recevoir des commandes
 sleep 5
-kubectl exec -it -n openfaas-fn postgres -- psql -U postgres -d cofrap_db -c "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username VARCHAR(50), password TEXT, mfa TEXT, gendate VARCHAR(50), expired INT DEFAULT 0);"
+kubectl exec -it -n openfaas-fn postgres -- psql -U postgres -d cofrap_db -c "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username VARCHAR(50) UNIQUE NOT NULL, password TEXT NOT NULL, mfa TEXT NOT NULL, gendate BIGINT NOT NULL, expired INT DEFAULT 0);"
 
 # ------------------------------------------
 # 7. INSTALLATION DU DASHBOARD K8S (Bonus)
@@ -152,6 +162,9 @@ subjects:
   name: admin-user
   namespace: kubernetes-dashboard
 EOF
+
+echo "Attente du démarrage des pods Dashboard..."
+kubectl wait --for=condition=ready pod --all -n kubernetes-dashboard --timeout=120s 2>/dev/null || true
 
 echo "✅ Dashboard installé."
 

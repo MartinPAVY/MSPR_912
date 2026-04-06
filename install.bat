@@ -43,6 +43,9 @@ echo ✅ OpenFaaS déployé.
 
 REM 4. LOGIN OPENFAAS (Astuce PowerShell pour le décodage)
 echo [4/8] Connexion à OpenFaaS...
+echo Liberation du port 8080...
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":8080 " 2^>nul') do taskkill /PID %%a /F >nul 2>&1
+
 echo Lancement du tunnel temporaire...
 start /b kubectl port-forward -n openfaas svc/gateway 8080:8080 >nul 2>&1
 timeout /t 5 /nobreak >nul
@@ -54,6 +57,10 @@ echo ✅ Tentative de connexion terminée.
 
 REM 5. DB
 echo [5/8] Déploiement de la Base de Données...
+
+REM Créer le secret Kubernetes pour le mot de passe PostgreSQL (idempotent)
+kubectl create secret generic db-password --from-literal=db-password=monSuperMotDePasse -n openfaas-fn --dry-run=client -o yaml | kubectl apply -f - >nul 2>&1
+
 kubectl apply -f postgres.yaml
 echo Attente du démarrage PostgreSQL...
 kubectl wait --for=condition=ready pod -l app=postgres -n openfaas-fn --timeout=60s >nul 2>&1
@@ -67,7 +74,7 @@ echo ✅ Fonctions traitées.
 REM 7. SQL
 echo [7/8] Initialisation SQL...
 timeout /t 5 /nobreak >nul
-kubectl exec -n openfaas-fn postgres -- psql -U postgres -d cofrap_db -c "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username VARCHAR(50) UNIQUE NOT NULL, password VARCHAR(255) NOT NULL, mfa VARCHAR(32) NOT NULL, gendate TIMESTAMP NOT NULL);" >nul 2>&1
+kubectl exec -n openfaas-fn postgres -- psql -U postgres -d cofrap_db -c "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username VARCHAR(50) UNIQUE NOT NULL, password TEXT NOT NULL, mfa TEXT NOT NULL, gendate BIGINT NOT NULL, expired INT DEFAULT 0);" >nul 2>&1
 
 REM 8. DASHBOARD K8S (Bonus)
 echo [8/8] Installation Dashboard K8S...
@@ -96,6 +103,9 @@ echo   namespace: kubernetes-dashboard >> admin-user.yaml
 
 kubectl apply -f admin-user.yaml >nul 2>&1
 del admin-user.yaml
+
+echo Attente du demarrage des pods Dashboard...
+kubectl wait --for=condition=ready pod --all -n kubernetes-dashboard --timeout=120s >nul 2>&1
 
 REM Récupération Token
 for /f "tokens=*" %%i in ('kubectl -n kubernetes-dashboard create token admin-user') do set TOKEN=%%i

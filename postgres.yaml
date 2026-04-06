@@ -11,7 +11,10 @@ spec:
       image: postgres:13
       env:
         - name: POSTGRES_PASSWORD
-          value: "monSuperMotDePasse"
+          valueFrom:
+            secretKeyRef:
+              name: db-password
+              key: db-password
         - name: POSTGRES_DB
           value: "cofrap_db"
       ports:

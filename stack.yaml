@@ -9,6 +9,8 @@ functions:
     image: martinpavy/register-user:final
     build_args:
       TEST_ENABLED: false
+    secrets:
+      - db-password
 
   auth-user:
     lang: python3-flask-debian
@@ -16,4 +18,15 @@ functions:
     image: martinpavy/auth-user:final
     build_args:
       TEST_ENABLED: false
+    secrets:
+      - db-password
+
+  renew-user:
+    lang: python3-flask-debian
+    handler: ./renew-user
+    image: martinpavy/renew-user:final
+    build_args:
+      TEST_ENABLED: false
+    secrets:
+      - db-password
 

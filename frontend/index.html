@@ -99,6 +99,16 @@
         </div>
     </div>
 
+    <!-- Renewal panel — hidden until an expired account triggers it -->
+    <div id="renewal_panel" style="display:none; max-width: 450px; margin: 30px auto 0;">
+        <div class="card" style="border: 2px solid #ffc107;">
+            <h2 style="border-color: #ffc107;">⚠️ Compte expiré — Renouvellement</h2>
+            <p id="renewal_msg"></p>
+            <div id="renewal_result" class="output"></div>
+            <img id="renewal_qrcode" src="" style="display:none; width: 150px; margin: 10px auto; display: block;" />
+        </div>
+    </div>
+
     <script>
         // --- FONCTION INSCRIPTION ---
         async function registerUser() {
@@ -130,8 +140,9 @@
 
         // --- FONCTION CONNEXION ---
         async function authUser() {
+            const username = document.getElementById("login_user").value;
             const payload = {
-                username: document.getElementById("login_user").value,
+                username,
                 password: document.getElementById("login_pass").value,
                 code_2fa: document.getElementById("login_2fa").value
             };
@@ -148,10 +159,48 @@
 
                 if (data.auth) {
                     resultDiv.innerHTML = `<span class="success">✅ ${data.message}</span>`;
+                } else if (data.action === "renew") {
+                    resultDiv.innerHTML = `<span class="error">⚠️ Compte expiré. Renouvellement automatique en cours...</span>`;
+                    await autoRenew(username);
                 } else {
                     resultDiv.innerHTML = `<span class="error">❌ Refusé : ${data.reason}</span>`;
                 }
             } catch (e) { resultDiv.innerHTML = `<span class="error">Erreur réseau</span>`; }
+        }
+
+        // --- RENOUVELLEMENT AUTOMATIQUE ---
+        async function autoRenew(username) {
+            const panel = document.getElementById("renewal_panel");
+            const msg = document.getElementById("renewal_msg");
+            const resultDiv = document.getElementById("renewal_result");
+            const img = document.getElementById("renewal_qrcode");
+
+            panel.style.display = 'block';
+            panel.scrollIntoView({ behavior: 'smooth' });
+            msg.innerHTML = `Renouvellement du compte <strong>${username}</strong>...`;
+            img.style.display = 'none';
+
+            try {
+                const response = await fetch('http://127.0.0.1:8080/function/renew-user', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username })
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    msg.innerHTML = `Compte <strong>${username}</strong> renouvelé avec succès.`;
+                    resultDiv.innerHTML = `<span class="success">Nouveau mot de passe :</span><br>
+                        <strong>${data.password_generated}</strong><br>
+                        <em>Scannez le nouveau QR Code dans Google Authenticator, puis reconnectez-vous.</em>`;
+                    img.src = "data:image/png;base64," + data.qr_code;
+                    img.style.display = 'block';
+                } else {
+                    resultDiv.innerHTML = `<span class="error">Erreur lors du renouvellement : ${data.error || 'Inconnue'}</span>`;
+                }
+            } catch (e) {
+                resultDiv.innerHTML = `<span class="error">Erreur réseau lors du renouvellement</span>`;
+            }
         }
     </script>
 

@@ -80,6 +80,10 @@ Write-Host "✅ OpenFaaS est déployé." -ForegroundColor $GREEN
 # ------------------------------------------
 Write-Host "[4/8] Connexion à OpenFaaS..." -ForegroundColor $BLUE
 
+# Libérer le port 8080 s'il est déjà occupé
+$occupied = Get-NetTCPConnection -LocalPort 8080 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess
+if ($occupied) { Stop-Process -Id $occupied -Force -ErrorAction SilentlyContinue }
+
 # On lance un port-forward temporaire
 $job = Start-Job -ScriptBlock { kubectl port-forward -n openfaas svc/gateway 8080:8080 }
 Start-Sleep -Seconds 7 # Pause pour laisser le tunnel s'ouvrir
@@ -99,6 +103,12 @@ try {
 # 5. DÉPLOIEMENT INFRA (DB + Fonctions)
 # ------------------------------------------
 Write-Host "[5/8] Déploiement de la Base de Données..." -ForegroundColor $BLUE
+
+# Créer le secret Kubernetes pour le mot de passe PostgreSQL (idempotent)
+kubectl create secret generic db-password `
+    --from-literal=db-password=monSuperMotDePasse `
+    -n openfaas-fn `
+    --dry-run=client -o yaml | kubectl apply -f - *> $null
 
 if (Test-Path "postgres.yaml") {
     kubectl apply -f postgres.yaml
@@ -128,7 +138,7 @@ Write-Host "[7/8] Création de la table SQL 'users'..." -ForegroundColor $BLUE
 
 Start-Sleep -Seconds 5
 try {
-    kubectl exec -n openfaas-fn postgres -- psql -U postgres -d cofrap_db -c "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username VARCHAR(50) UNIQUE NOT NULL, password VARCHAR(255) NOT NULL, mfa VARCHAR(32) NOT NULL, gendate TIMESTAMP NOT NULL);"
+    kubectl exec -n openfaas-fn postgres -- psql -U postgres -d cofrap_db -c "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username VARCHAR(50) UNIQUE NOT NULL, password TEXT NOT NULL, mfa TEXT NOT NULL, gendate BIGINT NOT NULL, expired INT DEFAULT 0);"
     Write-Host "✅ Table 'users' créée avec succès." -ForegroundColor $GREEN
 } catch {
     Write-Host "⚠️ Erreur lors de la création de la table (Peut-être déjà existante ?)" -ForegroundColor $YELLOW
@@ -173,6 +183,9 @@ $adminYaml | kubectl apply -f - *> $null
 
 # Récupération du Token
 $TOKEN = kubectl -n kubernetes-dashboard create token admin-user
+
+Write-Host "Attente du démarrage des pods Dashboard..." -ForegroundColor $YELLOW
+kubectl wait --for=condition=ready pod --all -n kubernetes-dashboard --timeout=120s *> $null
 
 Write-Host "✅ Dashboard installé." -ForegroundColor $GREEN
 
