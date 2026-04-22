@@ -71,8 +71,10 @@ kubectl exec -n openfaas-fn postgres -- psql -U postgres -d cofrap_db -c "CREATE
 
 REM 8. DASHBOARD K8S (Bonus)
 echo [8/8] Installation Dashboard K8S...
-helm repo add kubernetes-dashboard https://kubernetes.github.io/dashboard/ >nul 2>&1
-helm upgrade --install kubernetes-dashboard kubernetes-dashboard/kubernetes-dashboard --create-namespace --namespace kubernetes-dashboard --set protocolHttp=true --set service.externalPort=9090 --wait >nul 2>&1
+REM Installation via manifest officiel (le repo Helm kubernetes-dashboard n'est plus disponible)
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.7.0/aio/deploy/recommended.yaml >nul 2>&1
+echo Attente du demarrage du Dashboard...
+kubectl wait --for=condition=ready pod -l k8s-app=kubernetes-dashboard -n kubernetes-dashboard --timeout=120s >nul 2>&1
 
 REM Création Admin via fichier temp
 echo apiVersion: v1 > admin-user.yaml
@@ -112,7 +114,7 @@ echo Pour utiliser le projet :
 echo.
 echo 1️⃣  Ouvrez un terminal pour les Tunnels :
 echo    kubectl port-forward -n openfaas svc/gateway 8080:8080
-echo    kubectl -n kubernetes-dashboard port-forward svc/kubernetes-dashboard-kong-proxy 8443:443
+echo    kubectl -n kubernetes-dashboard port-forward svc/kubernetes-dashboard 8443:443
 echo.
 echo 2️⃣  Ouvrez un terminal pour le Frontend :
 echo    cd frontend ^&^& python -m http.server 8000

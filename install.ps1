@@ -138,14 +138,11 @@ try {
 # ------------------------------------------
 Write-Host "[8/8] Installation du Dashboard Kubernetes (Bonus)..." -ForegroundColor $BLUE
 
-helm repo add kubernetes-dashboard https://kubernetes.github.io/dashboard/ *> $null
-helm repo update *> $null
+# Installation via manifest officiel (le repo Helm kubernetes-dashboard n'est plus disponible)
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.7.0/aio/deploy/recommended.yaml *> $null
 
-helm upgrade --install kubernetes-dashboard kubernetes-dashboard/kubernetes-dashboard `
-    --create-namespace --namespace kubernetes-dashboard `
-    --set protocolHttp=true `
-    --set service.externalPort=9090 `
-    --wait *> $null
+Write-Host "Attente du démarrage du Dashboard..." -ForegroundColor $YELLOW
+kubectl wait --for=condition=ready pod -l k8s-app=kubernetes-dashboard -n kubernetes-dashboard --timeout=120s *> $null
 
 # Création du ServiceAccount Admin via Here-String PowerShell
 $adminYaml = @"
@@ -190,7 +187,7 @@ Write-Host ""
 Write-Host "1️⃣  Terminal 1 (Tunnels) :" -ForegroundColor $BLUE
 Write-Host "   kubectl port-forward -n openfaas svc/gateway 8080:8080" -ForegroundColor $YELLOW
 Write-Host "   (Ouvrez un nouvel onglet et lancez aussi :)" -ForegroundColor $YELLOW
-Write-Host "   kubectl -n kubernetes-dashboard port-forward svc/kubernetes-dashboard-kong-proxy 8443:443" -ForegroundColor $YELLOW
+Write-Host "   kubectl -n kubernetes-dashboard port-forward svc/kubernetes-dashboard 8443:443" -ForegroundColor $YELLOW
 Write-Host ""
 Write-Host "2️⃣  Terminal 2 (Serveur Frontend) :" -ForegroundColor $BLUE
 Write-Host "   cd frontend" -ForegroundColor $YELLOW

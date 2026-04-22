@@ -120,18 +120,13 @@ kubectl exec -it -n openfaas-fn postgres -- psql -U postgres -d cofrap_db -c "CR
 # ------------------------------------------
 echo -e "${BLUE}[8/8] Installation du Dashboard Kubernetes...${NC}"
 
-# Ajout du repo Helm officiel
-helm repo add kubernetes-dashboard https://kubernetes.github.io/dashboard/ > /dev/null 2>&1
-helm repo update > /dev/null 2>&1
+# Installation via manifest officiel (le repo Helm kubernetes-dashboard n'est plus disponible)
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.7.0/aio/deploy/recommended.yaml > /dev/null 2>&1
 
-# Installation du Dashboard
-helm upgrade --install kubernetes-dashboard kubernetes-dashboard/kubernetes-dashboard \
-    --create-namespace --namespace kubernetes-dashboard \
-    --set protocolHttp=true \
-    --set service.externalPort=9090 \
-    --wait > /dev/null 2>&1
+echo "Attente du démarrage du Dashboard..."
+kubectl wait --for=condition=ready pod -l k8s-app=kubernetes-dashboard -n kubernetes-dashboard --timeout=120s > /dev/null 2>&1
 
-# Création du compte Admin (Indispensable pour voir les ressources)
+# Création du compte Admin
 cat <<EOF | kubectl apply -f - > /dev/null 2>&1
 apiVersion: v1
 kind: ServiceAccount
@@ -156,7 +151,6 @@ EOF
 echo "✅ Dashboard installé."
 
 # Récupération du Token de connexion
-# Note: La commande change selon les versions de K8s, celle-ci est la plus robuste pour Docker Desktop récent
 TOKEN=$(kubectl -n kubernetes-dashboard create token admin-user)
 
 # ------------------------------------------
@@ -174,7 +168,7 @@ echo "Pour utiliser votre projet, ouvrez 2 terminaux :"
 echo ""
 echo -e "1️⃣  ${BLUE}Terminal 1 (Tunnel OpenFaaS & Dashboard) :${NC}"
 echo "   kubectl port-forward -n openfaas svc/gateway 8080:8080 &"
-echo "   kubectl -n kubernetes-dashboard port-forward svc/kubernetes-dashboard-kong-proxy 8443:443"
+echo "   kubectl -n kubernetes-dashboard port-forward svc/kubernetes-dashboard 8443:443"
 echo ""
 echo -e "2️⃣  ${BLUE}Terminal 2 (Serveur Frontend) :${NC}"
 echo "   cd frontend && python3 -m http.server 8000"
