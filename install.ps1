@@ -128,7 +128,9 @@ Write-Host "[7/8] Création de la table SQL 'users'..." -ForegroundColor $BLUE
 
 Start-Sleep -Seconds 5
 try {
-    kubectl exec -n openfaas-fn postgres -- psql -U postgres -d cofrap_db -c "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username VARCHAR(50) UNIQUE NOT NULL, password VARCHAR(255) NOT NULL, mfa VARCHAR(32) NOT NULL, gendate TIMESTAMP NOT NULL);"
+    kubectl exec -n openfaas-fn postgres -- psql -U postgres -d cofrap_db -c "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username VARCHAR(50) UNIQUE NOT NULL, password VARCHAR(255) NOT NULL, mfa VARCHAR(32) NOT NULL, gendate TIMESTAMP NOT NULL, expired INT DEFAULT 0, failed_attempts INT DEFAULT 0, locked_until TIMESTAMP);"
+    # Add columns if table already existed without them
+    kubectl exec -n openfaas-fn postgres -- psql -U postgres -d cofrap_db -c "ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_attempts INT DEFAULT 0; ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMP;" *> $null
     Write-Host "✅ Table 'users' créée avec succès." -ForegroundColor $GREEN
 } catch {
     Write-Host "⚠️ Erreur lors de la création de la table (Peut-être déjà existante ?)" -ForegroundColor $YELLOW

@@ -67,7 +67,8 @@ echo ✅ Fonctions traitées.
 REM 7. SQL
 echo [7/8] Initialisation SQL...
 timeout /t 5 /nobreak >nul
-kubectl exec -n openfaas-fn postgres -- psql -U postgres -d cofrap_db -c "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username VARCHAR(50) UNIQUE NOT NULL, password VARCHAR(255) NOT NULL, mfa VARCHAR(32) NOT NULL, gendate TIMESTAMP NOT NULL);" >nul 2>&1
+kubectl exec -n openfaas-fn postgres -- psql -U postgres -d cofrap_db -c "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username VARCHAR(50) UNIQUE NOT NULL, password VARCHAR(255) NOT NULL, mfa VARCHAR(32) NOT NULL, gendate TIMESTAMP NOT NULL, expired INT DEFAULT 0, failed_attempts INT DEFAULT 0, locked_until TIMESTAMP);" >nul 2>&1
+kubectl exec -n openfaas-fn postgres -- psql -U postgres -d cofrap_db -c "ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_attempts INT DEFAULT 0; ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMP;" >nul 2>&1
 
 REM 8. DASHBOARD K8S (Bonus)
 echo [8/8] Installation Dashboard K8S...

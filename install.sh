@@ -113,7 +113,9 @@ echo -e "${BLUE}[7/7] Création de la table SQL 'users'...${NC}"
 
 # On attend un peu que Postgres soit prêt à recevoir des commandes
 sleep 5
-kubectl exec -it -n openfaas-fn postgres -- psql -U postgres -d cofrap_db -c "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username VARCHAR(50), password TEXT, mfa TEXT, gendate VARCHAR(50), expired INT DEFAULT 0);"
+kubectl exec -it -n openfaas-fn postgres -- psql -U postgres -d cofrap_db -c "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username VARCHAR(50), password TEXT, mfa TEXT, gendate TIMESTAMP NOT NULL, expired INT DEFAULT 0, failed_attempts INT DEFAULT 0, locked_until TIMESTAMP);"
+# Add columns if table already existed without them
+kubectl exec -it -n openfaas-fn postgres -- psql -U postgres -d cofrap_db -c "ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_attempts INT DEFAULT 0; ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMP;" > /dev/null 2>&1
 
 # ------------------------------------------
 # 7. INSTALLATION DU DASHBOARD K8S (Bonus)
