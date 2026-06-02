@@ -17,3 +17,10 @@ functions:
     build_args:
       TEST_ENABLED: false
 
+  renew-user:
+    lang: python3-flask-debian
+    handler: ./renew-user
+    image: martinpavy/renew-user:final
+    build_args:
+      TEST_ENABLED: false
+
